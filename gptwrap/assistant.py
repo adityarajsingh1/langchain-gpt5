@@ -8,7 +8,9 @@ import openai
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 
-DEFAULT_SYSTEM = "You are a helpful assistant. Answer clearly and keep it short unless asked for detail."
+from gptwrap.personas import BUILT_IN, Persona, get_persona
+
+DEFAULT_SYSTEM = BUILT_IN["default"].render()
 
 
 class AssistantError(RuntimeError):
@@ -37,8 +39,18 @@ class Assistant:
             model = chat_model()
         self.model = model
         self.system = system
+        self.persona = None
         prompt = ChatPromptTemplate.from_messages([("system", "{system}"), ("human", "{question}")])
         self.chain = prompt | model | StrOutputParser()
+
+    @classmethod
+    def from_persona(cls, persona, model=None, **values):
+        """Assistant.from_persona("tutor", subject="chemistry", level="high school")"""
+        if not isinstance(persona, Persona):
+            persona = get_persona(persona)
+        bot = cls(model, system=persona.render(**values))
+        bot.persona = persona.name
+        return bot
 
     def ask(self, question):
         question = question.strip()
