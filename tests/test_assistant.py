@@ -22,12 +22,12 @@ def test_default_system_prompt(fake_chat):
     assert model.seen[0][0].content == DEFAULT_SYSTEM
 
 
-def test_each_question_stands_alone_for_now(fake_chat):
+def test_follow_up_questions_see_earlier_turns(fake_chat):
     model = fake_chat("one", "two")
     bot = Assistant(model)
     assert bot.ask("first") == "one"
     assert bot.ask("second") == "two"
-    assert len(model.seen[1]) == 2  # no memory yet, so no earlier turns in the prompt
+    assert [m.content for m in model.seen[1]][1:] == ["first", "one", "second"]
 
 
 def test_braces_in_questions_are_not_template_variables(fake_chat):

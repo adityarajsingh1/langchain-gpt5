@@ -27,7 +27,16 @@ bot = Assistant(system="You explain things to a 10 year old.")
 print(bot.ask("why is the sky blue?"))
 ```
 
-`Assistant` takes any LangChain chat model as its first argument and uses GPT-5 if you don't pass one. Each question is answered on its own for now (no memory yet). If the API call fails, you get an `AssistantError` with one line on what to check (key, model name, rate limit, connection) instead of the raw SDK exception.
+`Assistant` takes any LangChain chat model as its first argument and uses GPT-5 if you don't pass one. It remembers the conversation, separately for each session id:
+
+```python
+bot.ask("my name is Aditya", session="me")
+bot.ask("what's my name?", session="me")      # knows it
+bot.ask("what's my name?", session="someone") # doesn't
+bot.reset("me")                               # forget that conversation (reset(None) forgets all)
+```
+
+Only the last 20 question/answer pairs are sent along (`Assistant(max_turns=...)`, `None` for no limit), so a long chat doesn't get more expensive with every message. History lives in memory for now, so it's gone when the program exits. If the API call fails, you get an `AssistantError` with one line on what to check (key, model name, rate limit, connection) instead of the raw SDK exception.
 
 ### Personas
 

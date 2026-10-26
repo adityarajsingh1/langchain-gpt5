@@ -5,8 +5,9 @@ which is how the tests run without an API key.
 """
 
 import openai
+from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.output_parsers import StrOutputParser
-from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 
 from gptwrap.personas import BUILT_IN, Persona, get_persona
 
@@ -33,14 +34,29 @@ def _explain(err):
 
 
 class Assistant:
-    def __init__(self, model=None, system=DEFAULT_SYSTEM):
+    """
+    Remembers the conversation per session id, so one Assistant can talk to
+    several people (or keep several topics apart) at once.
+    max_turns limits how many earlier question/answer pairs are sent along,
+    so long chats don't get slower and more expensive forever. None = keep all.
+    """
+
+    def __init__(self, model=None, system=DEFAULT_SYSTEM, max_turns=20):
         if model is None:
             from gptwrap.models import chat_model
             model = chat_model()
         self.model = model
         self.system = system
         self.persona = None
-        prompt = ChatPromptTemplate.from_messages([("system", "{system}"), ("human", "{question}")])
+        self.max_turns = max_turns
+        # plain lists of messages per session. LangChain's own history classes
+        # are deprecated in favour of LangGraph, which is overkill for this
+        self._histories = {}
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", "{system}"),
+            MessagesPlaceholder("history"),
+            ("human", "{question}"),
+        ])
         self.chain = prompt | model | StrOutputParser()
 
     @classmethod
@@ -52,11 +68,32 @@ class Assistant:
         bot.persona = persona.name
         return bot
 
-    def ask(self, question):
+    def ask(self, question, session="default"):
         question = question.strip()
         if not question:
             raise ValueError("ask() needs a question")
+        history = self._histories.get(session, [])
         try:
-            return self.chain.invoke({"system": self.system, "question": question}).strip()
+            reply = self.chain.invoke({"system": self.system, "history": history, "question": question}).strip()
         except openai.OpenAIError as e:
+            # nothing gets saved when the call fails, so you can just ask again
             raise AssistantError(_explain(e)) from e
+        history = history + [HumanMessage(question), AIMessage(reply)]
+        if self.max_turns is not None:
+            history = history[-2 * self.max_turns:]  # a turn is one question + one answer
+        self._histories[session] = history
+        return reply
+
+    def history(self, session="default"):
+        """The saved messages of one session, oldest first."""
+        return list(self._histories.get(session, []))
+
+    def sessions(self):
+        return [s for s, h in self._histories.items() if h]
+
+    def reset(self, session="default"):
+        """Forget one session. reset(None) forgets all of them."""
+        if session is None:
+            self._histories.clear()
+        else:
+            self._histories.pop(session, None)
