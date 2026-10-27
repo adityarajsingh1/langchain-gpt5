@@ -72,17 +72,37 @@ class Assistant:
         question = question.strip()
         if not question:
             raise ValueError("ask() needs a question")
-        history = self._histories.get(session, [])
         try:
-            reply = self.chain.invoke({"system": self.system, "history": history, "question": question}).strip()
+            reply = self.chain.invoke(self._inputs(question, session)).strip()
         except openai.OpenAIError as e:
             # nothing gets saved when the call fails, so you can just ask again
             raise AssistantError(_explain(e)) from e
-        history = history + [HumanMessage(question), AIMessage(reply)]
+        self._remember(session, question, reply)
+        return reply
+
+    def stream(self, question, session="default"):
+        """Like ask(), but yields the answer piece by piece as the model writes it.
+        The turn is only saved once the whole answer has arrived."""
+        question = question.strip()
+        if not question:
+            raise ValueError("stream() needs a question")
+        pieces = []
+        try:
+            for piece in self.chain.stream(self._inputs(question, session)):
+                pieces.append(piece)
+                yield piece
+        except openai.OpenAIError as e:
+            raise AssistantError(_explain(e)) from e
+        self._remember(session, question, "".join(pieces).strip())
+
+    def _inputs(self, question, session):
+        return {"system": self.system, "history": self._histories.get(session, []), "question": question}
+
+    def _remember(self, session, question, reply):
+        history = self._histories.get(session, []) + [HumanMessage(question), AIMessage(reply)]
         if self.max_turns is not None:
             history = history[-2 * self.max_turns:]  # a turn is one question + one answer
         self._histories[session] = history
-        return reply
 
     def history(self, session="default"):
         """The saved messages of one session, oldest first."""

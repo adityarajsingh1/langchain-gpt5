@@ -3,8 +3,10 @@ from pathlib import Path
 
 import pytest
 from langchain_core.language_models import BaseChatModel
-from langchain_core.messages import AIMessage
-from langchain_core.outputs import ChatGeneration, ChatResult
+import re
+
+from langchain_core.messages import AIMessage, AIMessageChunk
+from langchain_core.outputs import ChatGeneration, ChatGenerationChunk, ChatResult
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
@@ -24,8 +26,18 @@ class RecordingChat(BaseChatModel):
         self.seen.append(messages)
         if self.error:
             raise self.error
-        text = self.replies[min(len(self.seen), len(self.replies)) - 1]
-        return ChatResult(generations=[ChatGeneration(message=AIMessage(content=text))])
+        return ChatResult(generations=[ChatGeneration(message=AIMessage(content=self._next_reply()))])
+
+    def _stream(self, messages, stop=None, run_manager=None, **kwargs):
+        # streams the reply word by word (keeping the spaces), like a real model would
+        self.seen.append(messages)
+        if self.error:
+            raise self.error
+        for piece in re.findall(r"\S+\s*|\s+", self._next_reply()):
+            yield ChatGenerationChunk(message=AIMessageChunk(content=piece))
+
+    def _next_reply(self):
+        return self.replies[min(len(self.seen), len(self.replies)) - 1]
 
 
 @pytest.fixture

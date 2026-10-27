@@ -38,6 +38,17 @@ bot.reset("me")                               # forget that conversation (reset(
 
 Only the last 20 question/answer pairs are sent along (`Assistant(max_turns=...)`, `None` for no limit), so a long chat doesn't get more expensive with every message. History lives in memory for now, so it's gone when the program exits. If the API call fails, you get an `AssistantError` with one line on what to check (key, model name, rate limit, connection) instead of the raw SDK exception.
 
+### Chatting in the terminal
+
+```bash
+python chat.py
+python chat.py --persona tutor --set subject=physics --set level="high school"
+```
+
+Answers stream in as GPT-5 writes them. While chatting, `/reset` forgets the conversation, `/history` shows it, `/system` shows the system prompt and `/quit` (or ctrl+d) leaves. Ctrl+c stops an answer halfway without ending the chat, and the stopped answer isn't kept in the history. API errors are printed as one line and you can keep going.
+
+From code it's `bot.stream("question")`, which yields the pieces of the answer.
+
 ### Personas
 
 A persona is a system prompt with blanks, so I don't keep rewriting the same "you are a tutor for..." prompt:
