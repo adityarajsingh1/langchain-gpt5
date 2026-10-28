@@ -3,6 +3,7 @@ Chat with GPT-5 in the terminal. Answers stream in as they're written.
 
     python chat.py
     python chat.py --persona tutor --set subject=physics --set level="high school"
+    python chat.py --no-tools
 
 Commands while chatting: /reset, /history, /system, /help, /quit
 """
@@ -13,6 +14,7 @@ import sys
 from gptwrap.assistant import Assistant, AssistantError
 from gptwrap.config import ConfigError
 from gptwrap.personas import BUILT_IN, PersonaError
+from gptwrap.tools import DEFAULT_TOOLS
 
 HELP = """commands:
   /reset     forget the conversation so far
@@ -80,11 +82,13 @@ def main():
                         help="which built-in persona to use (see python -m gptwrap --personas)")
     parser.add_argument("--set", action="append", default=[], metavar="NAME=VALUE",
                         help="fill in a persona variable, e.g. --set subject=physics (repeatable)")
+    parser.add_argument("--no-tools", action="store_true", help="don't give the model the calculator and date tools")
     parser.add_argument("--max-turns", type=int, default=20, help="earlier turns sent along with each question")
     args = parser.parse_args()
 
     try:
-        bot = Assistant.from_persona(args.persona, **parse_vars(args.set))
+        tools = [] if args.no_tools else DEFAULT_TOOLS
+        bot = Assistant.from_persona(args.persona, tools=tools, **parse_vars(args.set))
     except (ConfigError, PersonaError) as e:
         sys.exit(f"error: {e}")
     bot.max_turns = args.max_turns

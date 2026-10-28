@@ -49,6 +49,23 @@ Answers stream in as GPT-5 writes them. While chatting, `/reset` forgets the con
 
 From code it's `bot.stream("question")`, which yields the pieces of the answer.
 
+### Tools
+
+The model can use a few tools when it needs them:
+
+- `calculator`: exact arithmetic (`17 * 23`, `sqrt(2) * 10`, `(1 + 0.07) ** 10`). It doesn't use `eval()`: it walks the expression's syntax tree and only allows numbers, operators and a short list of math functions, so `__import__('os')` just gets an error back. Huge powers like `9 ** 9 ** 9` are refused too.
+- `current_datetime`: the date, time and weekday in any timezone (the model has no idea what day it is otherwise).
+- `days_between`: days between two dates.
+
+```python
+from gptwrap.tools import DEFAULT_TOOLS
+
+bot = Assistant(tools=DEFAULT_TOOLS)
+bot.ask("how many days until christmas?")
+```
+
+When the model asks for a tool, the tool runs, the result goes back to the model, and that repeats until it answers. It stops after 5 rounds (`max_tool_steps`) so a confused model can't loop forever. Only the question and the final answer are kept in the history. `chat.py` turns the tools on by default, `--no-tools` turns them off.
+
 ### Personas
 
 A persona is a system prompt with blanks, so I don't keep rewriting the same "you are a tutor for..." prompt:

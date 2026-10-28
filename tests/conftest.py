@@ -3,6 +3,7 @@ from pathlib import Path
 
 import pytest
 from langchain_core.language_models import BaseChatModel
+import json
 import re
 
 from langchain_core.messages import AIMessage, AIMessageChunk
@@ -17,6 +18,7 @@ class RecordingChat(BaseChatModel):
     replies: list = []
     error: Exception | None = None
     seen: list = []
+    bound_tools: list = []
 
     @property
     def _llm_type(self):
@@ -26,15 +28,27 @@ class RecordingChat(BaseChatModel):
         self.seen.append(messages)
         if self.error:
             raise self.error
-        return ChatResult(generations=[ChatGeneration(message=AIMessage(content=self._next_reply()))])
+        reply = self._next_reply()
+        message = reply if isinstance(reply, AIMessage) else AIMessage(content=reply)
+        return ChatResult(generations=[ChatGeneration(message=message)])
 
     def _stream(self, messages, stop=None, run_manager=None, **kwargs):
         # streams the reply word by word (keeping the spaces), like a real model would
         self.seen.append(messages)
         if self.error:
             raise self.error
-        for piece in re.findall(r"\S+\s*|\s+", self._next_reply()):
+        reply = self._next_reply()
+        if isinstance(reply, AIMessage):  # a tool call comes in one chunk
+            chunks = [{"name": c["name"], "args": json.dumps(c["args"]), "id": c["id"], "index": i}
+                      for i, c in enumerate(reply.tool_calls)]
+            yield ChatGenerationChunk(message=AIMessageChunk(content=reply.content, tool_call_chunks=chunks))
+            return
+        for piece in re.findall(r"\S+\s*|\s+", reply):
             yield ChatGenerationChunk(message=AIMessageChunk(content=piece))
+
+    def bind_tools(self, tools, **kwargs):
+        self.bound_tools = [t.name for t in tools]
+        return self
 
     def _next_reply(self):
         return self.replies[min(len(self.seen), len(self.replies)) - 1]
@@ -45,3 +59,8 @@ def fake_chat():
     def make(*replies, error=None):
         return RecordingChat(replies=list(replies) or ["ok"], error=error, seen=[])
     return make
+
+
+def tool_call(name, **args):
+    """An AIMessage where the model asks for one tool call instead of answering."""
+    return AIMessage(content="", tool_calls=[{"name": name, "args": args, "id": f"call_{name}"}])

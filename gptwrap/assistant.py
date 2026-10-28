@@ -6,7 +6,6 @@ which is how the tests run without an API key.
 
 import openai
 from langchain_core.messages import AIMessage, HumanMessage
-from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 
 from gptwrap.personas import BUILT_IN, Persona, get_persona
@@ -39,9 +38,13 @@ class Assistant:
     several people (or keep several topics apart) at once.
     max_turns limits how many earlier question/answer pairs are sent along,
     so long chats don't get slower and more expensive forever. None = keep all.
+
+    With tools, the model can ask for a tool call instead of answering. The
+    tool runs, its result goes back to the model, and that repeats until the
+    model answers (or max_tool_steps is used up).
     """
 
-    def __init__(self, model=None, system=DEFAULT_SYSTEM, max_turns=20):
+    def __init__(self, model=None, system=DEFAULT_SYSTEM, max_turns=20, tools=None, max_tool_steps=5):
         if model is None:
             from gptwrap.models import chat_model
             model = chat_model()
@@ -49,22 +52,24 @@ class Assistant:
         self.system = system
         self.persona = None
         self.max_turns = max_turns
+        self.tools = {t.name: t for t in tools or []}
+        self.max_tool_steps = max_tool_steps
         # plain lists of messages per session. LangChain's own history classes
         # are deprecated in favour of LangGraph, which is overkill for this
         self._histories = {}
-        prompt = ChatPromptTemplate.from_messages([
+        self.prompt = ChatPromptTemplate.from_messages([
             ("system", "{system}"),
             MessagesPlaceholder("history"),
             ("human", "{question}"),
         ])
-        self.chain = prompt | model | StrOutputParser()
+        self.llm = model.bind_tools(list(self.tools.values())) if self.tools else model
 
     @classmethod
-    def from_persona(cls, persona, model=None, **values):
+    def from_persona(cls, persona, model=None, tools=None, **values):
         """Assistant.from_persona("tutor", subject="chemistry", level="high school")"""
         if not isinstance(persona, Persona):
             persona = get_persona(persona)
-        bot = cls(model, system=persona.render(**values))
+        bot = cls(model, system=persona.render(**values), tools=tools)
         bot.persona = persona.name
         return bot
 
@@ -72,11 +77,8 @@ class Assistant:
         question = question.strip()
         if not question:
             raise ValueError("ask() needs a question")
-        try:
-            reply = self.chain.invoke(self._inputs(question, session)).strip()
-        except openai.OpenAIError as e:
-            # nothing gets saved when the call fails, so you can just ask again
-            raise AssistantError(_explain(e)) from e
+        # nothing gets saved when the call fails, so you can just ask again
+        reply = "".join(self._turn(question, session, streaming=False)).strip()
         self._remember(session, question, reply)
         return reply
 
@@ -87,13 +89,39 @@ class Assistant:
         if not question:
             raise ValueError("stream() needs a question")
         pieces = []
-        try:
-            for piece in self.chain.stream(self._inputs(question, session)):
-                pieces.append(piece)
-                yield piece
-        except openai.OpenAIError as e:
-            raise AssistantError(_explain(e)) from e
+        for piece in self._turn(question, session, streaming=True):
+            pieces.append(piece)
+            yield piece
         self._remember(session, question, "".join(pieces).strip())
+
+    def _turn(self, question, session, streaming):
+        """One question: call the model, run any tools it asks for, repeat. Yields the answer text."""
+        messages = self.prompt.invoke(self._inputs(question, session)).to_messages()
+        for _ in range(self.max_tool_steps + 1):
+            try:
+                if streaming:
+                    msg = None
+                    for chunk in self.llm.stream(messages):
+                        msg = chunk if msg is None else msg + chunk
+                        if chunk.text:
+                            yield chunk.text
+                else:
+                    msg = self.llm.invoke(messages)
+            except openai.OpenAIError as e:
+                raise AssistantError(_explain(e)) from e
+            if not msg.tool_calls:
+                if not streaming:
+                    yield msg.text
+                return
+            messages.append(msg)
+            messages.extend(self._run_tool(call) for call in msg.tool_calls)
+        raise AssistantError(f"gave up after {self.max_tool_steps} rounds of tool calls without an answer")
+
+    def _run_tool(self, call):
+        tool = self.tools.get(call["name"])
+        if tool is None:
+            raise AssistantError(f"the model asked for a tool that doesn't exist: {call['name']}")
+        return tool.invoke(call)  # given the whole tool call, a LangChain tool returns a ToolMessage
 
     def _inputs(self, question, session):
         return {"system": self.system, "history": self._histories.get(session, []), "question": question}
