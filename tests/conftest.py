@@ -7,6 +7,7 @@ import json
 import re
 
 from langchain_core.messages import AIMessage, AIMessageChunk
+from langchain_core.utils.function_calling import convert_to_openai_tool
 from langchain_core.outputs import ChatGeneration, ChatGenerationChunk, ChatResult
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -47,7 +48,8 @@ class RecordingChat(BaseChatModel):
             yield ChatGenerationChunk(message=AIMessageChunk(content=piece))
 
     def bind_tools(self, tools, **kwargs):
-        self.bound_tools = [t.name for t in tools]
+        # tools can be LangChain tools or plain Pydantic classes (structured output)
+        self.bound_tools = [convert_to_openai_tool(t)["function"]["name"] for t in tools]
         return self
 
     def _next_reply(self):
@@ -61,6 +63,6 @@ def fake_chat():
     return make
 
 
-def tool_call(name, **args):
+def tool_call(tool_name, /, **args):
     """An AIMessage where the model asks for one tool call instead of answering."""
-    return AIMessage(content="", tool_calls=[{"name": name, "args": args, "id": f"call_{name}"}])
+    return AIMessage(content="", tool_calls=[{"name": tool_name, "args": args, "id": f"call_{tool_name}"}])
