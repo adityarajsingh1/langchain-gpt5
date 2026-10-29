@@ -56,6 +56,7 @@ The model can use a few tools when it needs them:
 - `calculator`: exact arithmetic (`17 * 23`, `sqrt(2) * 10`, `(1 + 0.07) ** 10`). It doesn't use `eval()`: it walks the expression's syntax tree and only allows numbers, operators and a short list of math functions, so `__import__('os')` just gets an error back. Huge powers like `9 ** 9 ** 9` are refused too.
 - `current_datetime`: the date, time and weekday in any timezone (the model has no idea what day it is otherwise).
 - `days_between`: days between two dates.
+- `list_files` / `read_file` (opt in with `file_tools(folder)` or `chat.py --files FOLDER`): read text files, but only inside that one folder. Paths are fully resolved first, so `../`, absolute paths and symlinks pointing outside are all refused, and long files are cut off at 20k characters.
 
 ```python
 from gptwrap.tools import DEFAULT_TOOLS
