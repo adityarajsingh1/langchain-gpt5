@@ -69,6 +69,33 @@ When the model asks for a tool, the tool runs, the result goes back to the model
 
 If a tool call goes wrong (the model asks for a tool that doesn't exist, passes the wrong arguments, or the tool itself crashes), the error is sent back to the model as the tool's result instead of crashing the chat. The model usually fixes its call or answers without the tool. `chat.py` turns the tools on by default, `--no-tools` turns them off.
 
+### Structured output
+
+Sometimes I don't want prose, I want data I can use in code. `extract()` asks the model to fill in any Pydantic model, and `summarize()` uses a built-in `Summary` (title, one-line tl;dr, key points, action items, tone):
+
+```python
+from gptwrap.models import chat_model
+from gptwrap.structured import extract, summarize
+from pydantic import BaseModel
+
+s = summarize(chat_model(), open("meeting-notes.txt").read())
+print(s.action_items)     # a real list, not text to parse
+print(s.to_markdown())
+
+class Contact(BaseModel):
+    name: str
+    email: str | None = None
+
+extract(chat_model(), "write to Aditya at a@example.com", Contact)
+```
+
+If the model returns something that doesn't fit the schema (a missing field, a tone that isn't one of the allowed ones), it gets the validation error back and one more try. From the terminal:
+
+```bash
+python summarize.py meeting-notes.txt
+cat article.txt | python summarize.py --json
+```
+
 ### Personas
 
 A persona is a system prompt with blanks, so I don't keep rewriting the same "you are a tutor for..." prompt:
