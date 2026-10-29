@@ -5,7 +5,8 @@ which is how the tests run without an API key.
 """
 
 import openai
-from langchain_core.messages import AIMessage, HumanMessage
+from pydantic import ValidationError
+from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 
 from gptwrap.personas import BUILT_IN, Persona, get_persona
@@ -118,10 +119,23 @@ class Assistant:
         raise AssistantError(f"gave up after {self.max_tool_steps} rounds of tool calls without an answer")
 
     def _run_tool(self, call):
+        """Run one tool call. Problems go back to the model as an error result instead of
+        crashing the chat, so it can fix its arguments or answer without the tool."""
         tool = self.tools.get(call["name"])
         if tool is None:
-            raise AssistantError(f"the model asked for a tool that doesn't exist: {call['name']}")
-        return tool.invoke(call)  # given the whole tool call, a LangChain tool returns a ToolMessage
+            return self._tool_error(call, f"there's no tool called '{call['name']}'. "
+                                          f"available: {', '.join(self.tools)}")
+        try:
+            return tool.invoke(call)  # given the whole tool call, a LangChain tool returns a ToolMessage
+        except ValidationError as e:
+            problems = "; ".join(f"{'.'.join(map(str, err['loc']))}: {err['msg']}" for err in e.errors())
+            return self._tool_error(call, f"bad arguments for {call['name']}: {problems}")
+        except Exception as e:  # a broken tool shouldn't take the whole conversation down
+            return self._tool_error(call, f"{call['name']} failed: {type(e).__name__}: {e}")
+
+    @staticmethod
+    def _tool_error(call, text):
+        return ToolMessage(f"error: {text}", tool_call_id=call["id"], name=call["name"], status="error")
 
     def _inputs(self, question, session):
         return {"system": self.system, "history": self._histories.get(session, []), "question": question}

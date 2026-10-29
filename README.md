@@ -64,7 +64,9 @@ bot = Assistant(tools=DEFAULT_TOOLS)
 bot.ask("how many days until christmas?")
 ```
 
-When the model asks for a tool, the tool runs, the result goes back to the model, and that repeats until it answers. It stops after 5 rounds (`max_tool_steps`) so a confused model can't loop forever. Only the question and the final answer are kept in the history. `chat.py` turns the tools on by default, `--no-tools` turns them off.
+When the model asks for a tool, the tool runs, the result goes back to the model, and that repeats until it answers. It stops after 5 rounds (`max_tool_steps`) so a confused model can't loop forever. Only the question and the final answer are kept in the history.
+
+If a tool call goes wrong (the model asks for a tool that doesn't exist, passes the wrong arguments, or the tool itself crashes), the error is sent back to the model as the tool's result instead of crashing the chat. The model usually fixes its call or answers without the tool. `chat.py` turns the tools on by default, `--no-tools` turns them off.
 
 ### Personas
 
