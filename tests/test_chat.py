@@ -94,3 +94,15 @@ def test_cli_help_and_missing_key(tmp_path):
     out = subprocess.run([sys.executable, str(ROOT / "chat.py")], cwd=tmp_path, env=env,
                          capture_output=True, text=True)
     assert out.returncode != 0 and "OPENAI_API_KEY isn't set" in out.stderr
+
+
+def test_save_and_load_commands(fake_chat, tmp_path):
+    path = tmp_path / "chat.json"
+    model = fake_chat("Hi Aditya!")
+    term = Terminal("hello, I'm Aditya", f"/save {path}", "/reset", f"/load {path}", "/history", "/load", f"/load {tmp_path}/nope.json")
+    chat.chat(Assistant(model), term.read, term.write)
+    assert f"saved to {path}" in term.text
+    assert "loaded 2 messages" in term.text
+    assert "you: hello, I'm Aditya" in term.text
+    assert "usage: /load FILE" in term.text
+    assert "couldn't load:" in term.text and "doesn't exist" in term.text

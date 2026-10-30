@@ -36,7 +36,16 @@ bot.ask("what's my name?", session="someone") # doesn't
 bot.reset("me")                               # forget that conversation (reset(None) forgets all)
 ```
 
-Only the last 20 question/answer pairs are sent along (`Assistant(max_turns=...)`, `None` for no limit), so a long chat doesn't get more expensive with every message. History lives in memory for now, so it's gone when the program exits. If the API call fails, you get an `AssistantError` with one line on what to check (key, model name, rate limit, connection) instead of the raw SDK exception.
+Only the last 20 question/answer pairs are sent along (`Assistant(max_turns=...)`, `None` for no limit), so a long chat doesn't get more expensive with every message. History lives in memory, but a conversation can be saved to a JSON file and picked up later:
+
+```python
+from gptwrap.storage import load_conversation, save_conversation
+
+save_conversation(bot, "chats/physics.json")
+load_conversation(other_bot, "chats/physics.json")   # brings back the persona and system prompt too
+```
+
+The file is plain JSON (`{"version": 1, "persona": ..., "system": ..., "messages": [{"role": "human", "content": ...}, ...]}`), so other tools can read it. It's written to a temp file and then renamed, so a crash halfway never leaves a broken file, and loading a damaged or hand-edited file gives a clear error instead of a stack trace. If the API call fails, you get an `AssistantError` with one line on what to check (key, model name, rate limit, connection) instead of the raw SDK exception.
 
 ### Chatting in the terminal
 
@@ -45,7 +54,7 @@ python chat.py
 python chat.py --persona tutor --set subject=physics --set level="high school"
 ```
 
-Answers stream in as GPT-5 writes them. While chatting, `/reset` forgets the conversation, `/history` shows it, `/system` shows the system prompt and `/quit` (or ctrl+d) leaves. Ctrl+c stops an answer halfway without ending the chat, and the stopped answer isn't kept in the history. API errors are printed as one line and you can keep going.
+Answers stream in as GPT-5 writes them. While chatting, `/reset` forgets the conversation, `/history` shows it, `/system` shows the system prompt, `/save FILE` and `/load FILE` save and load the conversation, and `/quit` (or ctrl+d) leaves. `python chat.py --resume FILE` starts where a saved chat left off. Ctrl+c stops an answer halfway without ending the chat, and the stopped answer isn't kept in the history. API errors are printed as one line and you can keep going.
 
 From code it's `bot.stream("question")`, which yields the pieces of the answer.
 

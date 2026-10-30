@@ -4,9 +4,10 @@ Chat with GPT-5 in the terminal. Answers stream in as they're written.
     python chat.py
     python chat.py --persona tutor --set subject=physics --set level="high school"
     python chat.py --no-tools
+    python chat.py --resume chats/physics.json
     python chat.py --files ~/notes      # it can read files in ~/notes, nothing else
 
-Commands while chatting: /reset, /history, /system, /help, /quit
+Commands while chatting: /reset, /history, /system, /save, /load, /help, /quit
 """
 
 import argparse
@@ -16,12 +17,15 @@ from gptwrap.assistant import Assistant, AssistantError
 from gptwrap.config import ConfigError
 from gptwrap.files import file_tools
 from gptwrap.personas import BUILT_IN, PersonaError
+from gptwrap.storage import ConversationFileError, load_conversation, save_conversation
 from gptwrap.tools import DEFAULT_TOOLS
 
 HELP = """commands:
   /reset     forget the conversation so far
   /history   show the conversation so far
   /system    show the system prompt
+  /save FILE save the conversation as JSON
+  /load FILE load a saved conversation (replaces the current one)
   /quit      exit (ctrl+d works too, ctrl+c stops an answer halfway)"""
 
 
@@ -61,6 +65,21 @@ def chat(bot, read=input, write=print):
                     write("(nothing yet)")
             elif cmd == "/system":
                 write(bot.system)
+            elif cmd in ("/save", "/load"):
+                parts = line.split(maxsplit=1)
+                if len(parts) < 2:
+                    write(f"usage: {cmd} FILE")
+                elif cmd == "/save":
+                    try:
+                        write(f"saved to {save_conversation(bot, parts[1])}")
+                    except OSError as e:
+                        write(f"couldn't save: {e}")
+                else:
+                    try:
+                        n = load_conversation(bot, parts[1])
+                        write(f"loaded {n} messages, as '{bot.persona or 'default'}'.")
+                    except ConversationFileError as e:
+                        write(f"couldn't load: {e}")
             elif cmd == "/help":
                 write(HELP)
             else:
@@ -86,6 +105,7 @@ def main():
                         help="fill in a persona variable, e.g. --set subject=physics (repeatable)")
     parser.add_argument("--no-tools", action="store_true", help="don't give the model the calculator and date tools")
     parser.add_argument("--files", metavar="FOLDER", help="let the model list and read files in this folder (and only there)")
+    parser.add_argument("--resume", metavar="FILE", help="carry on a conversation saved with /save")
     parser.add_argument("--max-turns", type=int, default=20, help="earlier turns sent along with each question")
     args = parser.parse_args()
 
@@ -97,6 +117,11 @@ def main():
     except (ConfigError, PersonaError, ValueError) as e:
         sys.exit(f"error: {e}")
     bot.max_turns = args.max_turns
+    if args.resume:
+        try:
+            load_conversation(bot, args.resume)
+        except ConversationFileError as e:
+            sys.exit(f"error: {e}")
     chat(bot)
 
 
