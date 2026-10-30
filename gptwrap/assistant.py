@@ -150,6 +150,13 @@ class Assistant:
         """The saved messages of one session, oldest first."""
         return list(self._histories.get(session, []))
 
+    def set_history(self, messages, session="default"):
+        """Replace a session's history, e.g. with a conversation loaded from disk."""
+        messages = list(messages)
+        if any(m.type not in ("human", "ai") for m in messages):
+            raise ValueError("a history can only hold human and ai messages")
+        self._histories[session] = messages
+
     def sessions(self):
         return [s for s, h in self._histories.items() if h]
 
