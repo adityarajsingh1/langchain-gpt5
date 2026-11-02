@@ -1,9 +1,9 @@
 import json
 
 import pytest
+from conftest import tool_call
 
 import summarize
-from conftest import tool_call
 
 SUMMARY = dict(title="Notes", tldr="Short.", key_points=["one"], action_items=[], sentiment="positive")
 

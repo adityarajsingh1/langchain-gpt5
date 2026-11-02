@@ -65,7 +65,9 @@ def read_conversation(path):
     messages = []
     for i, m in enumerate(data.get("messages", [])):
         if not isinstance(m, dict) or m.get("role") not in _ROLES or not isinstance(m.get("content"), str):
-            raise ConversationFileError(f"message {i} in {path} should look like {{\"role\": \"human\"|\"ai\", \"content\": \"...\"}}")
+            raise ConversationFileError(
+                f"message {i} in {path} should look like {{\"role\": \"human\"|\"ai\", \"content\": \"...\"}}"
+            )
         messages.append(_ROLES[m["role"]](m["content"]))
     return data, messages
 

@@ -48,7 +48,8 @@ def file_tools(folder, max_chars=MAX_CHARS):
         except UnicodeDecodeError:
             raise ValueError(f"'{path}' isn't a text file") from None
         if len(text) > max_chars:
-            text = text[:max_chars] + f"\n\n[cut off: the file has {len(text)} characters, showing the first {max_chars}]"
+            note = f"[cut off: the file has {len(text)} characters, showing the first {max_chars}]"
+            text = text[:max_chars] + "\n\n" + note
         return text
 
     return [StructuredTool.from_function(list_files), StructuredTool.from_function(read_file)]

@@ -1,6 +1,6 @@
+from conftest import tool_call
 from langchain_core.tools import tool
 
-from conftest import tool_call
 from gptwrap.assistant import Assistant
 from gptwrap.tools import DEFAULT_TOOLS
 

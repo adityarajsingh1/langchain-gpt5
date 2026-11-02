@@ -1,7 +1,7 @@
 import pytest
+from conftest import tool_call
 from pydantic import BaseModel
 
-from conftest import tool_call
 from gptwrap.assistant import AssistantError
 from gptwrap.structured import Summary, extract, summarize
 

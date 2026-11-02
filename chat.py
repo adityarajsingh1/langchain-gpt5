@@ -104,7 +104,8 @@ def main():
     parser.add_argument("--set", action="append", default=[], metavar="NAME=VALUE",
                         help="fill in a persona variable, e.g. --set subject=physics (repeatable)")
     parser.add_argument("--no-tools", action="store_true", help="don't give the model the calculator and date tools")
-    parser.add_argument("--files", metavar="FOLDER", help="let the model list and read files in this folder (and only there)")
+    parser.add_argument("--files", metavar="FOLDER",
+                        help="let the model list and read files in this folder (and only there)")
     parser.add_argument("--resume", metavar="FILE", help="carry on a conversation saved with /save")
     parser.add_argument("--max-turns", type=int, default=20, help="earlier turns sent along with each question")
     args = parser.parse_args()

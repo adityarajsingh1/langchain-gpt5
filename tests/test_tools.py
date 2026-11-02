@@ -1,8 +1,8 @@
 from datetime import datetime
 
 import pytest
-
 from conftest import tool_call
+
 from gptwrap import tools
 from gptwrap.assistant import Assistant, AssistantError
 from gptwrap.tools import DEFAULT_TOOLS, calculate, calculator, current_datetime, days_between

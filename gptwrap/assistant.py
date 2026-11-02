@@ -5,9 +5,9 @@ which is how the tests run without an API key.
 """
 
 import openai
-from pydantic import ValidationError
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from pydantic import ValidationError
 
 from gptwrap.personas import BUILT_IN, Persona, get_persona
 

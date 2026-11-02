@@ -51,7 +51,8 @@ def test_stopping_a_stream_halfway_keeps_nothing(fake_chat):
 
 def test_stream_errors_are_readable(fake_chat):
     req = httpx.Request("POST", "https://api.openai.com/v1/chat/completions")
-    bot = Assistant(fake_chat(error=openai.AuthenticationError("no", response=httpx.Response(401, request=req), body=None)))
+    err = openai.AuthenticationError("no", response=httpx.Response(401, request=req), body=None)
+    bot = Assistant(fake_chat(error=err))
     with pytest.raises(AssistantError, match="OPENAI_API_KEY"):
         list(bot.stream("hi"))
 
@@ -99,7 +100,8 @@ def test_cli_help_and_missing_key(tmp_path):
 def test_save_and_load_commands(fake_chat, tmp_path):
     path = tmp_path / "chat.json"
     model = fake_chat("Hi Aditya!")
-    term = Terminal("hello, I'm Aditya", f"/save {path}", "/reset", f"/load {path}", "/history", "/load", f"/load {tmp_path}/nope.json")
+    term = Terminal("hello, I'm Aditya", f"/save {path}", "/reset", f"/load {path}", "/history",
+                    "/load", f"/load {tmp_path}/nope.json")
     chat.chat(Assistant(model), term.read, term.write)
     assert f"saved to {path}" in term.text
     assert "loaded 2 messages" in term.text

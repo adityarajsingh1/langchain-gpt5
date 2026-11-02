@@ -1,8 +1,8 @@
 import os
 
 import pytest
-
 from conftest import tool_call
+
 from gptwrap.assistant import Assistant
 from gptwrap.files import OutsideFolderError, file_tools
 
